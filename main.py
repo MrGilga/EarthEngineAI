@@ -1,16 +1,42 @@
-# This is a sample Python script.
+import os
+import os.path
+import requests
+import ee
 
-# Press Maiusc+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+ee.Authenticate()
+ee.Initialize()
 
+# Define the geometry of the area for which you would like images.
+box = ee.Geometry.Polygon([[8.8694, 45.7969],
+                           [8.8694, 45.7844],
+                           [8.8888, 45.7844],
+                           [8.8888, 45.7969]])
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+# .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12'])
+collection = (ee.ImageCollection("COPERNICUS/S2")
+              .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12'])
+              .filter(ee.Filter.date('2017-01-01', '2021-03-31'))
+              .filterBounds(box)
+              .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
+              )
 
+collectionList = collection.toList(collection.size())
+collectionSize = collectionList.size().getInfo()
+print(collectionSize)
+num_img = min(collectionSize, 10)
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+#if not os.path.exists("dataset"):
+# os.makedirs("dataset")
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+for i in range(num_img):
+    img = ee.Image(collectionList.get(i))
+    url = img.getDownloadUrl({
+        'bands': ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12'],
+        'region': box,
+        'scale': 10,
+        'format': 'GEO_TIFF'
+    })
+    print(url)
+    response = requests.get(url)
+    with open(os.path.join('dataset', 'multiband' + str(i) + '.tif'), 'wb') as fd:
+        fd.write(response.content)
